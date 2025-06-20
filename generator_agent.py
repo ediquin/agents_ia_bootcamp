@@ -17,7 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 # ==============================================================================
 # SECCIÓN 1: CONFIGURACIÓN Y HERRAMIENTAS OPTIMIZADAS
 # ==============================================================================
-GOOGLE_API_KEY = 'AIzaSyD1v0BJGVoq5-rzWwPlYF5setkJ-CNLubE'
+GOOGLE_API_KEY = 'Paste the API key Here'
 
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
