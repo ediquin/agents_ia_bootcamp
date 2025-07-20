@@ -17,7 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 # ==============================================================================
 # SECCIÓN 1: CONFIGURACIÓN Y HERRAMIENTAS OPTIMIZADAS
 # ==============================================================================
-GOOGLE_API_KEY = 'Paste the API key Here'
+GOOGLE_API_KEY = 'AIzaSyD1v0BJGVoq5-rzWwPlYF5setkJ-CNLubE'
 
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -163,16 +163,13 @@ def build_html_for_component(component: dict) -> str:
     content = component.get('content', {})
     layout_props = component.get('layout_properties', {})
     html = ""
-    
     # Manejar cuando content es un string en lugar de un objeto
     if isinstance(content, str):
         content_text = content
         content = {'text': content_text}
     elif not isinstance(content, dict):
         content = {}
-    
     if component_type == "Heading": 
-        # Priorizar level de layout_properties, luego de content, luego default
         level = layout_props.get('level') or content.get('level', 2)
         text = content.get('text', '')
         html = f"<h{level}>{text}</h{level}>"
@@ -186,7 +183,8 @@ def build_html_for_component(component: dict) -> str:
     elif component_type == "Image": 
         src = content.get('src', '') or layout_props.get('src', '')
         alt = content.get('alt', '') or layout_props.get('alt', '')
-        html = f'<img src="{src}" alt="{alt}" style="width: 100%;">'
+        # Bootstrap: img-fluid, rounded, my-3
+        html = f'<img src="{src}" alt="{alt}" class="img-fluid rounded my-3">'
     elif component_type == "Button": 
         url = content.get('url', '') or layout_props.get('url', '')
         text = content.get('text', '')
@@ -195,15 +193,15 @@ def build_html_for_component(component: dict) -> str:
         items = content.get('items', [])
         if isinstance(items, str):
             items = [items]
-        list_items = "".join([f"<li>{item}</li>" for item in items])
-        html = f"<ul>{list_items}</ul>"
+        # Bootstrap: list-group, list-group-flush, mb-3
+        list_items = "".join([f'<li class="list-group-item">{item}</li>' for item in items])
+        html = f'<ul class="list-group list-group-flush mb-3">{list_items}</ul>'
     elif component_type == "CustomHTML":
         html = content.get('html_code', component.get('original_html_snippet', ''))
     else:
         print(f"⚠️  Advertencia: Tipo de componente desconocido '{component_type}'. Usando contenido como texto.")
         text = content.get('text', str(content) if content else '')
         html = f"<div>{text}</div>"
-    
     return minify_html(html)
 
 # ==============================================================================
@@ -386,6 +384,75 @@ Responde ÚNICAMENTE con el JSON válido."""
         if driver:
             driver.quit()
 
+# ============================================================================== 
+# SECCIÓN 2.5: AGENTE OPTIMIZADOR SEO (NUEVO)
+# ==============================================================================
+def run_seo_agent(blueprint: dict, seo_keyword: str) -> dict | None:
+    """
+    Toma un blueprint de contenido y lo optimiza para una palabra clave SEO específica.
+    """
+    if not model:
+        print("El modelo de IA no está configurado. Omitiendo optimización SEO.")
+        return blueprint # Devuelve el original si no hay modelo
+        
+    print(f"📈 Agente SEO: Iniciando optimización para la palabra clave -> '{seo_keyword}'")
+
+    # Convertir el blueprint a un string JSON para enviarlo a la IA
+    blueprint_str = json.dumps(blueprint, indent=2)
+
+    seo_prompt = f"""
+Eres un experto SEO de clase mundial, especializado en copywriting y optimización de contenido on-page.
+Tu tarea es tomar el siguiente 'blueprint' de contenido de una página web en formato JSON y optimizarlo para la palabra clave objetivo: "{seo_keyword}".
+
+TUS DIRECTIVAS SON:
+1.  **Analiza todo el JSON**: Revisa todos los componentes como 'Heading', 'Paragraph', 'Image'.
+2.  **Reescribe el Contenido**:
+    -   **Títulos ('Heading')**: Asegúrate de que los títulos (especialmente el H1) incluyan la palabra clave principal de forma natural y atractiva.
+    -   **Párrafos ('Paragraph')**: Reescribe los párrafos para que sean más legibles, atractivos y para que incluyan la palabra clave y sinónimos o términos relacionados (LSI) de forma natural. No satures el texto con la palabra clave.
+    -   **Imágenes ('Image')**: Mejora el texto alternativo ('alt') para que sea descriptivo e incluya la palabra clave si es relevante para la imagen.
+    -   **Botones ('Button')**: Optimiza el texto de los botones (CTA) para que sean más persuasivos y orientados a la acción.
+3.  **MANTÉN LA ESTRUCTURA JSON**: Es CRÍTICO que devuelvas EXACTAMENTE la misma estructura JSON que recibiste. Solo debes modificar los valores de texto dentro de los campos "text", "alt", "heading", "paragraph", etc. NO cambies los "id", "component_type", ni la estructura general del JSON.
+
+BLUEPRINT DE CONTENIDO ORIGINAL:
+{blueprint_str}
+
+Responde ÚNICAMENTE con el JSON completo y optimizado. No incluyas explicaciones ni texto adicional fuera del JSON.
+"""
+
+    try:
+        generation_config = genai.GenerationConfig(
+            max_output_tokens=8192,
+            temperature=0.5, # Un poco más creativo para reescribir
+            top_p=0.9
+        )
+        
+        print("🤖 Enviando blueprint a Gemini para optimización SEO...")
+        response_llm = model.generate_content(seo_prompt, generation_config=generation_config)
+
+        if not response_llm or not response_llm.text:
+            print("Error: El modelo no devolvió respuesta para la optimización SEO.")
+            return blueprint # Devuelve el original si falla
+
+        json_text = response_llm.text.strip()
+        
+        # Limpiar la respuesta
+        if '```json' in json_text:
+            json_text = json_text.split('```json', 1)[1].rsplit('```', 1)[0]
+        json_text = json_text.strip()
+
+        optimized_blueprint = json.loads(json_text)
+        print("✅ Agente SEO: Blueprint optimizado exitosamente.")
+        return optimized_blueprint
+
+    except json.JSONDecodeError as e:
+        print(f"Error JSON en Agente SEO: {e}")
+        print("Respuesta recibida (primeros 500 chars):")
+        print(response_llm.text[:500])
+        return blueprint # Devuelve el original si falla
+    except Exception as e:
+        print(f"Error durante la optimización SEO: {e}")
+        return blueprint # Devuelve el original si falla
+
 # ==============================================================================
 # SECCIÓN 3: AGENTE CONSTRUCTOR CORREGIDO (v2.4)
 # ==============================================================================
@@ -466,30 +533,89 @@ def run_generator_agent(blueprint: dict) -> str:
     print("✅ Agente Constructor: Guía completada.")
     return "\n".join(guide_parts)
 
+# ============================================================================== 
+# SECCIÓN 3.5: GENERADOR DE PÁGINA HTML (ACTUALIZADO CON BOOTSTRAP)
+# ==============================================================================
+def create_full_html_page(blueprint: dict) -> str:
+    """
+    Toma el blueprint final y genera una página HTML completa y funcional
+    utilizando el framework de Bootstrap para el diseño.
+    """
+    print("🏗️ Generador HTML: Ensamblando página completa con Bootstrap...")
+    # --- Extraer contenido y título ---
+    component_list = blueprint.get('main_content_blueprint', [])
+    page_title = "Página Migrada"
+    for component in component_list:
+        if component.get("component_type") == "Heading" and component.get("content", {}).get("level") == 1:
+            page_title = component.get("content", {}).get("text", page_title)
+            break
+    html_parts = [build_html_for_component(c) for c in component_list if isinstance(c, dict)]
+    body_content = f"""
+    <div class=\"container mt-5\">
+        {''.join(html_parts)}
+    </div>
+    """
+    full_page_html = f"""
+<!DOCTYPE html>
+<html lang=\"es\">
+<head>
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>{page_title}</title>
+    <link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH\" crossorigin=\"anonymous\">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;
+        }}
+        h1, h2, h3 {{
+            font-weight: 300;
+        }}
+    </style>
+</head>
+<body>
+    {body_content}
+    <script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz\" crossorigin=\"anonymous\"></script>
+</body>
+</html>
+    """
+    return full_page_html
+
+def save_html_to_file(html_content: str, filename: str = "pagina_migrada.html"):
+    """Guarda una cadena de texto en un archivo HTML."""
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        print(f"💾 Página HTML guardada exitosamente en: ./{filename}")
+    except Exception as e:
+        print(f"❌ Error al guardar el archivo HTML: {e}")
+
 # ==============================================================================
 # SECCIÓN 4: ORQUESTADOR PRINCIPAL
 # ==============================================================================
 def main():
-    print("🚀 Orquestador v3.0: Iniciando pipeline optimizado...")
+    print("🚀 Orquestador v3.3 (con Bootstrap): Iniciando pipeline...")
     target_url = "https://www.legacychryslerjeepdodgeram.net/car-dealership-serving/pendleton-or/"
-    
+    seo_keyword = "concesionario de autos en Pendleton OR"
     json_blueprint = run_mapping_agent(target_url)
-    
     if json_blueprint:
         print("\n" + "="*60)
-        print(" Blueprint JSON Optimizado ".center(60))
+        print(" Blueprint JSON Original ".center(60))
         print("="*60)
-        print(json.dumps(json_blueprint, indent=2)[:2000] + "..." if len(str(json_blueprint)) > 2000 else json.dumps(json_blueprint, indent=2))
-        
-        migration_guide = run_generator_agent(json_blueprint)
-        
+        print(json.dumps(json_blueprint, indent=2, ensure_ascii=False)[:1000] + "...")
+        optimized_blueprint = run_seo_agent(json_blueprint, seo_keyword)
+        migration_guide = run_generator_agent(optimized_blueprint)
         print("\n" + "="*60)
-        print(" Guía de Migración Final ".center(60))
+        print(" Guía de Migración Final (con contenido SEO) ".center(60))
         print("="*60)
         print(migration_guide)
+        # --- PASO 4: Generar y guardar la página HTML (ACTUALIZADO) ---
+        print("\n" + "="*60)
+        print(" Exportación a HTML con Bootstrap ".center(60))
+        print("="*60)
+        final_html_page = create_full_html_page(optimized_blueprint)
+        save_html_to_file(final_html_page, "pagina_migrada.html")
     else:
         print("\n❌ El proceso no pudo completarse debido a un error en la fase de análisis.")
-    
     print("\n✅ Orquestador: Proceso finalizado.")
 
 if __name__ == "__main__":
