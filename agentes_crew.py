@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv # <-- AÑADE ESTA LÍNEA
 load_dotenv() # <-- Y ESTA LÍNEA
-from crewai import Agent, Task, Crew
+# from crewai import Agent, Task, Crew
 # from crewai_tools import ScrapeWebsiteTool # <-- COMENTADO PORQUE LA HERRAMIENTA NO EXISTE
 
 # NOTA: Debes asegurarte de tener la API Key como una variable de entorno.

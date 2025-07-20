@@ -1,4 +1,2 @@
 streamlit
-crewai
-crewai-tools
 langchain-google-genai

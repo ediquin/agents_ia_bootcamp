@@ -1,6 +1,6 @@
 import streamlit as st
 from agentes_crew import AgentesDeContenido, TareasDeContenido
-from crewai import Crew
+# from crewai import Crew
 
 import requests
 from bs4 import BeautifulSoup
